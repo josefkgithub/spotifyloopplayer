@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Loop Player"/>
+<meta name="theme-color" content="#121212"/>
+<title>Loop Practice Player</title>
+
+<!-- PWA manifest inline -->
+<script>
+const manifestData = {
+  name: "Spotify Loop Practice Player",
+  short_name: "Loop Player",
+  start_url: "./",
+  display: "standalone",
+  background_color: "#121212",
+  theme_color: "#121212",
+  orientation: "portrait",
+  icons: [
+    { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='40' fill='%23121212'/%3E%3Ccircle cx='96' cy='96' r='60' fill='none' stroke='%231DB954' stroke-width='10'/%3E%3Cpolygon points='78,68 78,124 130,96' fill='%231DB954'/%3E%3C/svg%3E", sizes: "192x192", type: "image/svg+xml" },
+    { src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='100' fill='%23121212'/%3E%3Ccircle cx='256' cy='256' r='160' fill='none' stroke='%231DB954' stroke-width='24'/%3E%3Cpolygon points='208,176 208,336 368,256' fill='%231DB954'/%3E%3C/svg%3E", sizes: "512x512", type: "image/svg+xml" }
+  ]
+};
+const blob = new Blob([JSON.stringify(manifestData)], {type:'application/json'});
+const manifestURL = URL.createObjectURL(blob);
+const link = document.createElement('link');
+link.rel = 'manifest'; link.href = manifestURL;
+document.head.appendChild(link);
+</script>
+
+<!-- Apple touch icon inline SVG via data URI -->
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' rx='40' fill='%23121212'/%3E%3Ccircle cx='90' cy='90' r='56' fill='none' stroke='%231DB954' stroke-width='9'/%3E%3Cpolygon points='74,64 74,116 122,90' fill='%231DB954'/%3E%3C/svg%3E"/>
+
+<style>
+  :root {
+    --green: #1DB954;
+    --green-dim: #1DB95422;
+    --green-border: #1DB95444;
+    --bg: #121212;
+    --card: #1e1e1e;
+    --input: #2a2a2a;
+    --border: #333;
+    --text: #fff;
+    --muted: #aaa;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bot: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, sans-serif; overscroll-behavior: none; }
+  body { display: flex; flex-direction: column; padding-top: var(--safe-top); padding-bottom: var(--safe-bot); }
+
+  /* Header */
+  .header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1rem 0.5rem; flex-shrink: 0; }
+  .header h1 { font-size: 1.2rem; font-weight: 700; color: var(--green); }
+
+  /* Scrollable content */
+  .scroll { flex: 1; overflow-y: auto; padding: 0 1rem 1rem; -webkit-overflow-scrolling: touch; }
+
+  /* Bottom tab bar */
+  .tabbar { display: flex; background: #1a1a1a; border-top: 1px solid var(--border); flex-shrink: 0; padding-bottom: var(--safe-bot); }
+  .tabbar-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 10px 0; font-size: 10px; color: var(--muted); border: none; background: none; cursor: pointer; }
+  .tabbar-btn.active { color: var(--green); }
+  .tabbar-icon { font-size: 20px; line-height: 1; }
+
+  /* Cards */
+  .card { background: var(--card); border-radius: 14px; padding: 1rem; margin-bottom: 0.75rem; }
+
+  /* Inputs & buttons */
+  input { background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 10px; padding: 0.6rem 0.75rem; font-size: 15px; width: 100%; }
+  input:focus { outline: none; border-color: var(--green); }
+  .btn-green { background: var(--green); color: #000; border: none; border-radius: 10px; padding: 0.65rem 1.1rem; font-weight: 700; font-size: 15px; cursor: pointer; white-space: nowrap; }
+  .btn-green:active { opacity: 0.8; }
+  .btn-ghost { background: none; border: 1px solid #555; color: var(--muted); border-radius: 10px; padding: 0.5rem 0.9rem; font-size: 13px; cursor: pointer; }
+  .btn-ghost:active { background: #2a2a2a; }
+  .btn-icon { background: none; border: none; cursor: pointer; font-size: 18px; padding: 6px; line-height: 1; color: var(--muted); }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase; color: #666; margin-bottom: 8px; }
+
+  /* Auth */
+  .auth-box { background: #1a2a1a; border: 1px solid var(--green-border); border-radius: 14px; padding: 1.1rem; margin-bottom: 0.75rem; font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .auth-box strong { color: var(--green); }
+  .token-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+
+  /* Track info */
+  .track-row { display: flex; align-items: center; gap: 12px; margin-bottom: 1rem; }
+  .track-art { width: 58px; height: 58px; border-radius: 10px; object-fit: cover; background: #333; flex-shrink: 0; }
+  .track-meta { flex: 1; min-width: 0; }
+  .track-meta h2 { font-size: 1rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track-meta p { font-size: 13px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Timeline */
+  .timeline-wrap { position: relative; height: 52px; margin-bottom: 6px; touch-action: none; }
+  .tl-bg { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 5px; background: #333; border-radius: 3px; }
+  .tl-progress { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 5px; background: #555; border-radius: 3px; pointer-events: none; }
+  .loop-region { position: absolute; top: 50%; transform: translateY(-50%); height: 5px; background: #1DB95455; border-radius: 3px; pointer-events: none; }
+  .loop-handle { position: absolute; top: 50%; transform: translate(-50%,-50%); width: 18px; height: 28px; background: var(--green); border-radius: 5px; z-index: 10; touch-action: none; }
+  .loop-handle-label { position: absolute; top: -17px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 700; color: var(--green); }
+  .playhead { position: absolute; top: 50%; transform: translate(-50%,-50%); width: 16px; height: 16px; background: #fff; border-radius: 50%; pointer-events: none; z-index: 20; }
+  .loop-times { display: flex; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 10px; flex-wrap: wrap; }
+  .loop-times span { background: var(--input); border-radius: 6px; padding: 3px 8px; }
+  .loop-times span b { color: var(--green); }
+
+  /* Controls */
+  .controls { display: flex; align-items: center; gap: 10px; margin-bottom: 0.75rem; }
+  .ctrl-btn { background: var(--input); border: 1px solid var(--border); color: var(--text); border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 15px; flex-shrink: 0; }
+  .ctrl-btn:active { background: #3a3a3a; }
+  .ctrl-btn.play { background: var(--green); color: #000; border-color: var(--green); font-size: 18px; width: 48px; height: 48px; }
+  .ctrl-btn.play:active { opacity: 0.85; }
+  .time-lbl { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .badge { font-size: 12px; background: var(--green-dim); color: var(--green); border-radius: 6px; padding: 3px 9px; border: 1px solid var(--green-border); white-space: nowrap; }
+
+  /* Loops list */
+  .loop-item { display: flex; align-items: center; gap: 8px; background: var(--input); border-radius: 10px; padding: 10px 12px; border: 1px solid transparent; margin-bottom: 6px; }
+  .loop-item.active-loop { border-color: var(--green); background: var(--green-dim); }
+  .loop-item-name { font-size: 14px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .loop-item-meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+  /* Favorites */
+  .fav-item { display: flex; align-items: center; gap: 10px; background: var(--input); border-radius: 12px; padding: 10px 12px; border: 1px solid transparent; margin-bottom: 8px; }
+  .fav-item.current-track { border-color: var(--green); background: var(--green-dim); }
+  .fav-art { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: #333; flex-shrink: 0; }
+  .fav-meta { flex: 1; min-width: 0; }
+  .fav-meta strong { font-size: 14px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fav-meta span { font-size: 12px; color: var(--muted); }
+  .fav-loops-badge { font-size: 11px; color: var(--green); background: var(--green-dim); border-radius: 4px; padding: 2px 7px; white-space: nowrap; }
+
+  .no-items { font-size: 13px; color: #555; text-align: center; padding: 2rem 1rem; }
+  .star { font-size: 22px; }
+
+  /* Tab panels */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* Repeat row */
+  .repeat-row { display: flex; align-items: center; gap: 8px; margin-bottom: 0.5rem; }
+  .repeat-row label { font-size: 13px; color: var(--muted); }
+  .repeat-row input { width: 64px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>&#9654; Loop Player</h1>
+  <div id="header-right"></div>
+</div>
+
+<div class="scroll" id="scroll">
+
+  <!-- AUTH -->
+  <div id="auth-panel">
+    <div class="auth-box">
+      <strong>Connect your Spotify account</strong><br>
+      Enter your Spotify app's Client ID — PKCE runs entirely in the browser, no server needed.
+      <br><br>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <input id="client-id-input" placeholder="Spotify Client ID..." />
+        <div class="row">
+          <button class="btn-green" style="flex:1;" onclick="startPKCE()">Connect Spotify</button>
+          <button class="btn-ghost" onclick="loadDemo()">Demo</button>
+        </div>
+      </div>
+      <div class="token-pill" id="token-status" style="display:none;"></div>
+      <div style="margin-top:10px;font-size:11px;color:#555;">
+        Redirect URI to whitelist: <span id="redirect-uri-lbl" style="color:#888;"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOAD TRACK (shown after auth) -->
+  <div id="url-card" class="card" style="display:none;">
+    <div class="section-label">Load a track</div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <input id="track-url" placeholder="Paste Spotify track URL or ID…" />
+      <button class="btn-green" onclick="loadTrack()">Load Track</button>
+    </div>
+  </div>
+
+  <!-- PLAYER TAB -->
+  <div class="tab-panel active" id="tab-player">
+
+    <div class="card" id="player-card" style="display:none;">
+      <div class="track-row">
+        <img id="track-art" class="track-art" src="" alt=""/>
+        <div class="track-meta">
+          <h2 id="track-name">—</h2>
+          <p id="track-artist"></p>
+        </div>
+        <button class="btn-icon star" id="fav-star" onclick="toggleFav()" style="color:#444;">&#9733;</button>
+      </div>
+
+      <div class="timeline-wrap" id="timeline"
+           onmousedown="tlDown(event)" ontouchstart="tlTouchDown(event)">
+        <div class="tl-bg"></div>
+        <div class="tl-progress" id="tl-prog"></div>
+        <div class="loop-region" id="loop-region"></div>
+        <div class="loop-handle" id="ha" onmousedown="hDown(event,'a')" ontouchstart="hTouchDown(event,'a')"><span class="loop-handle-label">A</span></div>
+        <div class="loop-handle" id="hb" onmousedown="hDown(event,'b')" ontouchstart="hTouchDown(event,'b')"><span class="loop-handle-label">B</span></div>
+        <div class="playhead" id="playhead"></div>
+      </div>
+
+      <div class="loop-times">
+        <span>Loop: <b id="lbl-a">0:00</b> → <b id="lbl-b">0:00</b></span>
+        <span>Dur: <b id="lbl-dur">0:00</b></span>
+        <span id="loop-badge" class="badge">∞</span>
+      </div>
+
+      <div class="controls">
+        <button class="ctrl-btn" onclick="seek(-10)">«</button>
+        <button class="ctrl-btn play" id="play-btn" onclick="togglePlay()">&#9654;</button>
+        <button class="ctrl-btn" onclick="seek(10)">»</button>
+        <span class="time-lbl" id="tcur">0:00</span>
+        <span class="time-lbl" style="color:#444;">/</span>
+        <span class="time-lbl" id="ttot">0:00</span>
+      </div>
+
+      <div class="repeat-row">
+        <label>Repeats:</label>
+        <input type="number" id="rep-count" min="1" max="999" placeholder="∞" onchange="updateRep()" style="width:64px;"/>
+        <span id="loop-badge2" class="badge" style="margin-left:4px;">Loop ∞</span>
+      </div>
+    </div>
+
+    <div class="card" id="save-card" style="display:none;">
+      <div class="section-label">Save current loop</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <input id="loop-name" placeholder="Name (e.g. Verse 1, Guitar Solo…)"/>
+        <button class="btn-green" onclick="saveLoop()">Save Loop</button>
+      </div>
+    </div>
+
+    <div class="card" id="loops-card" style="display:none;">
+      <div class="section-label">Saved loops</div>
+      <div id="loops-list"><div class="no-items">No loops yet — set A/B and save above.</div></div>
+    </div>
+
+  </div>
+
+  <!-- FAVORITES TAB -->
+  <div class="tab-panel" id="tab-favorites">
+    <div class="card">
+      <div class="section-label">Favorite tracks</div>
+      <div id="fav-list"><div class="no-items">No favorites yet — tap ★ on a track to save it.</div></div>
+    </div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="tab-panel" id="tab-settings">
+    <div class="card">
+      <div class="section-label">Spotify connection</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">
+        Client ID: <span id="settings-cid" style="color:#fff;"></span>
+      </div>
+      <div class="row" style="flex-wrap:wrap;gap:8px;">
+        <button class="btn-green" onclick="startPKCE()">Re-connect</button>
+        <button class="btn-ghost" onclick="logout()">Disconnect</button>
+      </div>
+      <div style="margin-top:12px;font-size:11px;color:#555;">
+        Redirect URI: <span id="settings-redirect" style="color:#777;word-break:break-all;"></span>
+      </div>
+    </div>
+    <div class="card">
+      <div class="section-label">About</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.7;">
+        Spotify Loop Practice Player — set A/B loop points on any track to drill specific sections.<br><br>
+        Requires <strong style="color:#fff;">Spotify Premium</strong> for playback.
+      </div>
+    </div>
+  </div>
+
+</div><!-- /scroll -->
+
+<!-- Bottom tab bar -->
+<nav class="tabbar" id="tabbar" style="display:none;">
+  <button class="tabbar-btn active" onclick="switchTab('player')" id="tbtn-player">
+    <span class="tabbar-icon">&#9654;</span>Player
+  </button>
+  <button class="tabbar-btn" onclick="switchTab('favorites')" id="tbtn-favorites">
+    <span class="tabbar-icon">&#9733;</span>Favorites
+  </button>
+  <button class="tabbar-btn" onclick="switchTab('settings')" id="tbtn-settings">
+    <span class="tabbar-icon">&#9881;</span>Settings
+  </button>
+</nav>
+
+<script>
+const REDIRECT_URI = window.location.origin + window.location.pathname.replace(/\/$/,'');
+const SCOPES = 'streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state';
+document.getElementById('redirect-uri-lbl').textContent = REDIRECT_URI;
+document.getElementById('settings-redirect').textContent = REDIRECT_URI;
+
+let token = null, tokenExpiry = 0;
+let player = null, deviceId = null;
+let trackDuration = 0, currentPos = 0;
+let loopA = 0, loopB = 0, isPlaying = false;
+let loops = [], activeLoopIdx = -1;
+let repeatCount = Infinity, repeatsDone = 0;
+let dragging = null, dragStartX = 0, dragStartVal = 0;
+let rafId = null, lastTimestamp = 0, posAtLastSync = 0;
+let demoMode = false;
+let currentTrack = null;
+let favorites = {};
+
+// ── Storage ──────────────────────────────────────────────────────────────────
+function saveFavs() { try { localStorage.setItem('sp_favorites', JSON.stringify(favorites)); } catch(e){} }
+function loadFavs() { try { const d = localStorage.getItem('sp_favorites'); if (d) favorites = JSON.parse(d); } catch(e){} }
+
+// ── PKCE helpers ─────────────────────────────────────────────────────────────
+function rnd64(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return btoa(String.fromCharCode(...a)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,''); }
+async function sha256b64(s) { const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return btoa(String.fromCharCode(...new Uint8Array(h))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,''); }
+
+async function startPKCE() {
+  const id = (document.getElementById('client-id-input').value || localStorage.getItem('sp_client_id') || '').trim();
+  if (!id) { alert('Please enter your Spotify Client ID.'); return; }
+  localStorage.setItem('sp_client_id', id);
+  const verifier = rnd64(64), state = rnd64(16);
+  localStorage.setItem('sp_verifier', verifier);
+  localStorage.setItem('sp_state', state);
+  const challenge = await sha256b64(verifier);
+  const url = new URL('https://accounts.spotify.com/authorize');
+  url.searchParams.set('client_id', id);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('redirect_uri', REDIRECT_URI);
+  url.searchParams.set('scope', SCOPES);
+  url.searchParams.set('code_challenge_method', 'S256');
+  url.searchParams.set('code_challenge', challenge);
+  url.searchParams.set('state', state);
+  window.location.href = url.toString();
+}
+
+async function exchangeCode(code, clientId, verifier) {
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'},
+    body: new URLSearchParams({grant_type:'authorization_code', code, redirect_uri:REDIRECT_URI, client_id:clientId, code_verifier:verifier})
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function refreshAccessToken() {
+  const clientId = localStorage.getItem('sp_client_id'), rt = localStorage.getItem('sp_refresh_token');
+  if (!clientId || !rt) return false;
+  try {
+    const res = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({grant_type:'refresh_token', refresh_token:rt, client_id:clientId})
+    });
+    if (!res.ok) return false;
+    setTokens(await res.json()); return true;
+  } catch { return false; }
+}
+
+function setTokens(data) {
+  token = data.access_token;
+  tokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
+  if (data.refresh_token) localStorage.setItem('sp_refresh_token', data.refresh_token);
+  const el = document.getElementById('token-status');
+  el.style.display = 'flex';
+  el.innerHTML = `<span class="dot"></span>&nbsp;Connected`;
+  const cid = localStorage.getItem('sp_client_id') || '';
+  document.getElementById('settings-cid').textContent = cid.slice(0,8) + '…';
+}
+
+async function getToken() {
+  if (token && Date.now() < tokenExpiry) return token;
+  return await refreshAccessToken() ? token : null;
+}
+
+function logout() {
+  ['sp_client_id','sp_verifier','sp_state','sp_refresh_token'].forEach(k => localStorage.removeItem(k));
+  token = null; player = null; deviceId = null;
+  window.location.href = REDIRECT_URI;
+}
+
+// ── Spotify SDK ───────────────────────────────────────────────────────────────
+function initSDK() {
+  window.onSpotifyWebPlaybackSDKReady = () => {
+    player = new Spotify.Player({ name:'Loop Practice Player', getOAuthToken: async cb => cb(await getToken()), volume:0.8 });
+    player.addListener('ready', ({device_id}) => {
+      deviceId = device_id;
+      document.getElementById('url-card').style.display = '';
+      document.getElementById('tabbar').style.display = '';
+    });
+    player.addListener('player_state_changed', onStateChanged);
+    player.addListener('authentication_error', refreshAccessToken);
+    player.connect();
+  };
+  if (window.Spotify) { window.onSpotifyWebPlaybackSDKReady(); return; }
+  const s = document.createElement('script'); s.src = 'https://sdk.scdn.co/spotify-player.js'; document.head.appendChild(s);
+}
+
+function onStateChanged(state) {
+  if (!state) return;
+  isPlaying = !state.paused;
+  document.getElementById('play-btn').innerHTML = isPlaying ? '&#9646;&#9646;' : '&#9654;';
+  currentPos = state.position / 1000; posAtLastSync = currentPos; lastTimestamp = performance.now();
+  updateUI();
+}
+
+// ── Track loading ─────────────────────────────────────────────────────────────
+async function loadTrack(idOverride) {
+  const raw = idOverride || document.getElementById('track-url').value.trim();
+  let id = raw; const m = raw.match(/track\/([A-Za-z0-9]+)/); if (m) id = m[1];
+  if (!id) return;
+  if (!demoMode) {
+    const t = await getToken(); if (!t) return;
+    const res = await fetch(`https://api.spotify.com/v1/tracks/${id}`, {headers:{Authorization:'Bearer '+t}});
+    const tr = await res.json(); if (!tr.name) { alert('Track not found.'); return; }
+    currentTrack = {id:tr.id, name:tr.name, artist:tr.artists.map(a=>a.name).join(', '), art:tr.album.images[0]?.url||'', duration:tr.duration_ms/1000};
+    fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+      method:'PUT', headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},
+      body: JSON.stringify({uris:[`spotify:track:${tr.id}`]})
+    });
+  }
+  applyTrack();
+}
+
+function applyTrack() {
+  document.getElementById('track-name').textContent = currentTrack.name;
+  document.getElementById('track-artist').textContent = currentTrack.artist;
+  document.getElementById('track-art').src = currentTrack.art;
+  trackDuration = currentTrack.duration;
+  loops = favorites[currentTrack.id] ? favorites[currentTrack.id].loops.map(l=>({...l})) : [];
+  activeLoopIdx = -1; loopA = 0; loopB = trackDuration;
+  updateHandles(); updateFavStar(); updateFavList();
+  ['player-card','save-card','loops-card'].forEach(i => document.getElementById(i).style.display='');
+  document.getElementById('tabbar').style.display = '';
+  renderLoops(); switchTab('player');
+  posAtLastSync = 0; lastTimestamp = performance.now(); startRAF();
+}
+
+// ── Favorites ─────────────────────────────────────────────────────────────────
+function toggleFav() {
+  if (!currentTrack) return;
+  if (favorites[currentTrack.id]) delete favorites[currentTrack.id];
+  else favorites[currentTrack.id] = {track:{...currentTrack}, loops:loops.map(l=>({...l}))};
+  saveFavs(); updateFavStar(); updateFavList();
+}
+
+function updateFavStar() {
+  const s = document.getElementById('fav-star');
+  const on = currentTrack && !!favorites[currentTrack.id];
+  s.style.color = on ? '#f5c518' : '#444';
+  s.title = on ? 'Remove from favorites' : 'Add to favorites';
+}
+
+function syncLoopsToFav() {
+  if (currentTrack && favorites[currentTrack.id]) {
+    favorites[currentTrack.id].loops = loops.map(l=>({...l}));
+    saveFavs(); updateFavList();
+  }
+}
+
+function updateFavList() {
+  const list = document.getElementById('fav-list');
+  const ids = Object.keys(favorites);
+  if (!ids.length) { list.innerHTML = '<div class="no-items">No favorites yet.</div>'; return; }
+  list.innerHTML = '';
+  ids.forEach(id => {
+    const f = favorites[id], isCur = currentTrack && currentTrack.id === id;
+    const d = document.createElement('div');
+    d.className = 'fav-item' + (isCur ? ' current-track' : '');
+    d.innerHTML = `<img class="fav-art" src="${f.track.art}" alt=""/>
+      <div class="fav-meta"><strong>${f.track.name}</strong><span>${f.track.artist}</span></div>
+      ${f.loops.length ? `<span class="fav-loops-badge">${f.loops.length} loop${f.loops.length>1?'s':''}</span>` : ''}
+      <button class="btn-icon" style="color:#f5c518;font-size:20px;" onclick="removeFav('${id}',event)">&#9733;</button>`;
+    d.onclick = () => loadFavTrack(id);
+    list.appendChild(d);
+  });
+}
+
+function removeFav(id, e) { e.stopPropagation(); delete favorites[id]; saveFavs(); updateFavStar(); updateFavList(); }
+
+async function loadFavTrack(id) {
+  const f = favorites[id]; if (!f) return;
+  currentTrack = {...f.track}; loops = f.loops.map(l=>({...l}));
+  if (!demoMode && deviceId) {
+    const t = await getToken(); if (!t) return;
+    fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+      method:'PUT', headers:{Authorization:'Bearer '+t,'Content-Type':'application/json'},
+      body: JSON.stringify({uris:[`spotify:track:${id}`]})
+    });
+  }
+  document.getElementById('track-url').value = '';
+  applyTrack();
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  ['player','favorites','settings'].forEach(n => {
+    document.getElementById('tab-'+n).classList.toggle('active', n===name);
+    document.getElementById('tbtn-'+n).classList.toggle('active', n===name);
+  });
+}
+
+// ── Playback ──────────────────────────────────────────────────────────────────
+function togglePlay() {
+  if (demoMode) { isPlaying=!isPlaying; document.getElementById('play-btn').innerHTML=isPlaying?'&#9646;&#9646;':'&#9654;'; return; }
+  if (!player) return; isPlaying ? player.pause() : player.resume();
+}
+
+async function seek(delta) {
+  if (demoMode) { currentPos=Math.max(0,Math.min(trackDuration,currentPos+delta)); posAtLastSync=currentPos; lastTimestamp=performance.now(); updateUI(); return; }
+  if (!player) return;
+  const s = await player.getCurrentState(); if (!s) return;
+  player.seek(Math.max(0, Math.min(trackDuration*1000, s.position+delta*1000)));
+}
+
+function updateRep() {
+  const v = parseInt(document.getElementById('rep-count').value);
+  repeatCount = isNaN(v) ? Infinity : v; repeatsDone = 0;
+  const lbl = isNaN(v) ? 'Loop ∞' : `Loop ×${v}`;
+  document.getElementById('loop-badge').textContent = isNaN(v) ? '∞' : `×${v}`;
+  document.getElementById('loop-badge2').textContent = lbl;
+}
+
+// ── Timeline ──────────────────────────────────────────────────────────────────
+function fmt(s) { const m=Math.floor(s/60),ss=Math.floor(s%60); return m+':'+String(ss).padStart(2,'0'); }
+function tlR() { return document.getElementById('timeline').getBoundingClientRect(); }
+function xToT(x) { const r=tlR(); return Math.max(0,Math.min(trackDuration,((x-r.left)/r.width)*trackDuration)); }
+function fr(t) { return trackDuration ? t/trackDuration : 0; }
+
+function updateHandles() {
+  const w = document.getElementById('timeline').offsetWidth;
+  const ax=fr(loopA)*w, bx=fr(loopB)*w;
+  document.getElementById('ha').style.left=ax+'px';
+  document.getElementById('hb').style.left=bx+'px';
+  document.getElementById('loop-region').style.left=ax+'px';
+  document.getElementById('loop-region').style.width=(bx-ax)+'px';
+  document.getElementById('lbl-a').textContent=fmt(loopA);
+  document.getElementById('lbl-b').textContent=fmt(loopB);
+  document.getElementById('lbl-dur').textContent=fmt(Math.max(0,loopB-loopA));
+}
+
+function updateUI() {
+  if (!trackDuration) return;
+  const f=Math.min(1,currentPos/trackDuration);
+  document.getElementById('tl-prog').style.width=(f*100)+'%';
+  document.getElementById('playhead').style.left=(f*document.getElementById('timeline').offsetWidth)+'px';
+  document.getElementById('tcur').textContent=fmt(currentPos);
+  document.getElementById('ttot').textContent=fmt(trackDuration);
+}
+
+function startRAF() {
+  if (rafId) cancelAnimationFrame(rafId);
+  function tick(now) {
+    if (isPlaying) {
+      currentPos = posAtLastSync + (now-lastTimestamp)/1000;
+      if (currentPos >= loopB) {
+        if (repeatCount !== Infinity && ++repeatsDone >= repeatCount) {
+          isPlaying=false; document.getElementById('play-btn').innerHTML='&#9654;';
+          currentPos=loopA; if (!demoMode && player) player.pause();
+        }
+        if (isPlaying) { currentPos=loopA; posAtLastSync=loopA; lastTimestamp=now; if (!demoMode && player) player.seek(loopA*1000); }
+      }
+      if (currentPos < loopA) { currentPos=loopA; posAtLastSync=loopA; lastTimestamp=now; if (!demoMode && player) player.seek(loopA*1000); }
+      updateUI();
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+  rafId = requestAnimationFrame(tick);
+}
+
+function seekTo(t) { currentPos=t; posAtLastSync=t; lastTimestamp=performance.now(); if (!demoMode && player) player.seek(t*1000); updateUI(); }
+
+function tlDown(e) { if (e.target.classList.contains('loop-handle')) return; seekTo(xToT(e.clientX)); }
+function tlTouchDown(e) { if (e.target.classList.contains('loop-handle')) return; seekTo(xToT(e.touches[0].clientX)); }
+function hDown(e,w) { e.stopPropagation(); e.preventDefault(); dragging=w; dragStartX=e.clientX; dragStartVal=w==='a'?loopA:loopB; }
+function hTouchDown(e,w) { e.stopPropagation(); e.preventDefault(); dragging=w; dragStartX=e.touches[0].clientX; dragStartVal=w==='a'?loopA:loopB; }
+
+function dragMove(x) {
+  if (!dragging) return;
+  const dt=((x-dragStartX)/tlR().width)*trackDuration;
+  const v=Math.max(0,Math.min(trackDuration,dragStartVal+dt));
+  if (dragging==='a') loopA=Math.min(v,loopB-1); else loopB=Math.max(v,loopA+1);
+  updateHandles();
+}
+document.addEventListener('mousemove', e => dragMove(e.clientX));
+document.addEventListener('touchmove', e => { e.preventDefault(); dragMove(e.touches[0].clientX); }, {passive:false});
+document.addEventListener('mouseup', () => dragging=null);
+document.addEventListener('touchend', () => dragging=null);
+
+// ── Loops ─────────────────────────────────────────────────────────────────────
+function saveLoop() {
+  const name = document.getElementById('loop-name').value.trim() || `Loop ${loops.length+1}`;
+  loops.push({name, a:loopA, b:loopB, repeats:repeatCount});
+  document.getElementById('loop-name').value='';
+  renderLoops(); syncLoopsToFav();
+}
+
+function renderLoops() {
+  const list=document.getElementById('loops-list');
+  if (!loops.length) { list.innerHTML='<div class="no-items">No loops yet.</div>'; return; }
+  list.innerHTML='';
+  loops.forEach((lp,i) => {
+    const d=document.createElement('div');
+    d.className='loop-item'+(i===activeLoopIdx?' active-loop':'');
+    d.innerHTML=`<span class="loop-item-name">${lp.name}</span>
+      <span class="loop-item-meta">${fmt(lp.a)}–${fmt(lp.b)}</span>
+      <span class="loop-item-meta" style="color:var(--green);margin-left:4px;">${lp.repeats===Infinity?'∞':'×'+lp.repeats}</span>
+      <button class="btn-icon" style="color:#666;" onclick="delLoop(${i},event)">✕</button>`;
+    d.onclick=()=>activateLoop(i);
+    list.appendChild(d);
+  });
+}
+
+function activateLoop(i) {
+  activeLoopIdx=i; const lp=loops[i];
+  loopA=lp.a; loopB=lp.b; repeatCount=lp.repeats; repeatsDone=0;
+  document.getElementById('rep-count').value=lp.repeats===Infinity?'':lp.repeats;
+  document.getElementById('loop-badge').textContent=lp.repeats===Infinity?'∞':'×'+lp.repeats;
+  document.getElementById('loop-badge2').textContent=lp.repeats===Infinity?'Loop ∞':'Loop ×'+lp.repeats;
+  updateHandles(); seekTo(loopA); renderLoops();
+}
+
+function delLoop(i,e) {
+  e.stopPropagation(); loops.splice(i,1);
+  if (activeLoopIdx===i) activeLoopIdx=-1; else if (activeLoopIdx>i) activeLoopIdx--;
+  renderLoops(); syncLoopsToFav();
+}
+
+// ── Demo ──────────────────────────────────────────────────────────────────────
+function loadDemo() {
+  demoMode=true;
+  currentTrack={id:'demo1',name:'Comfortably Numb',artist:'Pink Floyd',art:'https://upload.wikimedia.org/wikipedia/en/3/35/WallCoverPinkFloyd.jpg',duration:382};
+  if (!favorites['demo1']) {
+    favorites['demo1']={track:{...currentTrack},loops:[
+      {name:'Verse 1',a:12,b:42,repeats:Infinity},
+      {name:'Guitar Solo',a:210,b:310,repeats:3}
+    ]};
+    saveFavs();
+  }
+  loops=favorites['demo1'].loops.map(l=>({...l}));
+  document.getElementById('url-card').style.display='';
+  document.getElementById('tabbar').style.display='';
+  applyTrack();
+  isPlaying=true; document.getElementById('play-btn').innerHTML='&#9646;&#9646;';
+  posAtLastSync=loopA; lastTimestamp=performance.now();
+}
+
+// ── Service Worker (offline shell) ────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    const CACHE = 'loop-player-v1';
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(['/'])));
+    });
+    self.addEventListener('fetch', e => {
+      if (e.request.url.includes('spotify.com')) return;
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+    });
+  `;
+  const swBlob = new Blob([swCode], {type:'application/javascript'});
+  navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
+}
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+(async function init() {
+  loadFavs();
+  const stored = localStorage.getItem('sp_client_id');
+  if (stored) document.getElementById('client-id-input').value = stored;
+
+  // Handle PKCE callback (?code=...&state=...)
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code'), retState = params.get('state'), err = params.get('error');
+
+  if (err) { alert('Spotify error: '+err); window.history.replaceState({},'',REDIRECT_URI); return; }
+
+  if (code) {
+    const savedState=localStorage.getItem('sp_state'), verifier=localStorage.getItem('sp_verifier'), clientId=localStorage.getItem('sp_client_id');
+    if (!savedState || retState!==savedState) { alert('State mismatch. Please try again.'); window.history.replaceState({},'',REDIRECT_URI); return; }
+    localStorage.removeItem('sp_state'); localStorage.removeItem('sp_verifier');
+    window.history.replaceState({},'',REDIRECT_URI);
+    try { setTokens(await exchangeCode(code,clientId,verifier)); initSDK(); } catch(e) { alert('Token error: '+e.message); }
+    return;
+  }
+
+  if (localStorage.getItem('sp_refresh_token')) {
+    const ok = await refreshAccessToken();
+    if (ok) { initSDK(); return; }
+  }
+})();
+</script>
+</body>
+</html>
