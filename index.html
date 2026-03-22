@@ -192,7 +192,6 @@ document.head.appendChild(link);
       <div class="loop-times">
         <span>Loop: <b id="lbl-a">0:00</b> → <b id="lbl-b">0:00</b></span>
         <span>Dur: <b id="lbl-dur">0:00</b></span>
-        <span id="loop-badge" class="badge">∞</span>
       </div>
 
       <div class="controls">
@@ -202,12 +201,6 @@ document.head.appendChild(link);
         <span class="time-lbl" id="tcur">0:00</span>
         <span class="time-lbl" style="color:#444;">/</span>
         <span class="time-lbl" id="ttot">0:00</span>
-      </div>
-
-      <div class="repeat-row">
-        <label>Repeats:</label>
-        <input type="number" id="rep-count" min="1" max="999" placeholder="∞" onchange="updateRep()" style="width:64px;"/>
-        <span id="loop-badge2" class="badge" style="margin-left:4px;">Loop ∞</span>
       </div>
     </div>
 
@@ -221,7 +214,7 @@ document.head.appendChild(link);
 
     <div class="card" id="loops-card" style="display:none;">
       <div class="section-label">Saved loops</div>
-      <div id="loops-list"><div class="no-items">No loops yet — set A/B and save above.</div></div>
+      <div id="loops-list" style="max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
     </div>
 
   </div>
@@ -293,7 +286,6 @@ let player = null, deviceId = null;
 let trackDuration = 0, currentPos = 0;
 let loopA = 0, loopB = 0, isPlaying = false;
 let loops = [], activeLoopIdx = -1;
-let repeatCount = Infinity, repeatsDone = 0;
 let dragging = null, dragStartX = 0, dragStartVal = 0;
 let rafId = null, lastTimestamp = 0, posAtLastSync = 0;
 let demoMode = false;
@@ -558,13 +550,13 @@ function startRAF() {
     if (isPlaying) {
       currentPos = posAtLastSync + (now-lastTimestamp)/1000;
       if (currentPos >= loopB) {
-        if (repeatCount !== Infinity && ++repeatsDone >= repeatCount) {
-          isPlaying=false; document.getElementById('play-btn').innerHTML='&#9654;';
-          currentPos=loopA; if (!demoMode && player) player.pause();
-        }
-        if (isPlaying) { currentPos=loopA; posAtLastSync=loopA; lastTimestamp=now; if (!demoMode && player) player.seek(loopA*1000); }
+        currentPos=loopA; posAtLastSync=loopA; lastTimestamp=now;
+        if (!demoMode && player) player.seek(loopA*1000);
       }
-      if (currentPos < loopA) { currentPos=loopA; posAtLastSync=loopA; lastTimestamp=now; if (!demoMode && player) player.seek(loopA*1000); }
+      if (currentPos < loopA) {
+        currentPos=loopA; posAtLastSync=loopA; lastTimestamp=now;
+        if (!demoMode && player) player.seek(loopA*1000);
+      }
       updateUI();
     }
     rafId = requestAnimationFrame(tick);
