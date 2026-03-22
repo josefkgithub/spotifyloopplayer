@@ -592,7 +592,7 @@ document.addEventListener('touchend', () => dragging=null);
 // ── Loops ─────────────────────────────────────────────────────────────────────
 function saveLoop() {
   const name = document.getElementById('loop-name').value.trim() || `Loop ${loops.length+1}`;
-  loops.push({name, a:loopA, b:loopB, repeats:repeatCount});
+  loops.push({name, a:loopA, b:loopB});
   document.getElementById('loop-name').value='';
   renderLoops(); syncLoopsToFav();
 }
