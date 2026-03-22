@@ -154,18 +154,15 @@ document.head.appendChild(link);
   <div id="auth-panel">
     <div class="auth-box">
       <strong>Connect your Spotify account</strong><br>
-      Enter your Spotify app's Client ID — PKCE runs entirely in the browser, no server needed.
+      Tap the button below to log in with Spotify Premium.
       <br><br>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <input id="client-id-input" placeholder="Spotify Client ID..." />
-        <div class="row">
-          <button class="btn-green" style="flex:1;" onclick="startPKCE()">Connect Spotify</button>
-          <button class="btn-ghost" onclick="loadDemo()">Demo</button>
-        </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-green" style="flex:1;" onclick="startPKCE()">Connect Spotify</button>
+        <button class="btn-ghost" onclick="loadDemo()">Demo</button>
       </div>
       <div class="token-pill" id="token-status" style="display:none;"></div>
       <div style="margin-top:10px;font-size:11px;color:#555;">
-        Redirect URI to whitelist: <span id="redirect-uri-lbl" style="color:#888;"></span>
+        Redirect URI to whitelist: <span id="redirect-uri-lbl" style="color:#888;word-break:break-all;"></span>
       </div>
     </div>
   </div>
@@ -289,6 +286,8 @@ document.head.appendChild(link);
 <script>
 const REDIRECT_URI = window.location.origin + window.location.pathname.replace(/\/$/,'');
 const SCOPES = 'streaming user-read-email user-read-private user-modify-playback-state user-read-playback-state';
+const DEFAULT_CLIENT_ID = 'eb6cbc16ddbe431e85716c1bc326a965';
+const DEFAULT_TRACK_URL = 'https://open.spotify.com/track/2IfMEQZuVzOlwj3AKcpaLS?si=UzGbAiTpR4SKyzpXS9O8rQ';
 document.getElementById('redirect-uri-lbl').textContent = REDIRECT_URI;
 document.getElementById('settings-redirect').textContent = REDIRECT_URI;
 
@@ -313,8 +312,7 @@ function rnd64(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); retu
 async function sha256b64(s) { const h = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s)); return btoa(String.fromCharCode(...new Uint8Array(h))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,''); }
 
 async function startPKCE() {
-  const id = (document.getElementById('client-id-input').value || localStorage.getItem('sp_client_id') || '').trim();
-  if (!id) { alert('Please enter your Spotify Client ID.'); return; }
+  const id = DEFAULT_CLIENT_ID;
   localStorage.setItem('sp_client_id', id);
   const verifier = rnd64(64), state = rnd64(16);
   localStorage.setItem('sp_verifier', verifier);
@@ -360,8 +358,7 @@ function setTokens(data) {
   const el = document.getElementById('token-status');
   el.style.display = 'flex';
   el.innerHTML = `<span class="dot"></span>&nbsp;Connected`;
-  const cid = localStorage.getItem('sp_client_id') || '';
-  document.getElementById('settings-cid').textContent = cid.slice(0,8) + '…';
+  document.getElementById('settings-cid').textContent = '••••••••••••••••';
 }
 
 async function getToken() {
@@ -499,7 +496,11 @@ function switchTab(name) {
 // ── Playback ──────────────────────────────────────────────────────────────────
 function togglePlay() {
   if (demoMode) { isPlaying=!isPlaying; document.getElementById('play-btn').innerHTML=isPlaying?'&#9646;&#9646;':'&#9654;'; return; }
-  if (!player) return; isPlaying ? player.pause() : player.resume();
+  if (!player) return;
+  // activateElement() is required on iOS to unlock audio context on first user gesture
+  player.activateElement().then(() => {
+    isPlaying ? player.pause() : player.resume();
+  });
 }
 
 async function seek(delta) {
@@ -660,8 +661,13 @@ if ('serviceWorker' in navigator) {
 // ── Boot ──────────────────────────────────────────────────────────────────────
 (async function init() {
   loadFavs();
-  const stored = localStorage.getItem('sp_client_id');
-  if (stored) document.getElementById('client-id-input').value = stored;
+  document.getElementById('redirect-uri-lbl').textContent = REDIRECT_URI;
+  document.getElementById('settings-redirect').textContent = REDIRECT_URI;
+  // Pre-fill track URL
+  const trackInput = document.getElementById('track-url');
+  if (trackInput) trackInput.value = DEFAULT_TRACK_URL;
+
+  const stored = localStorage.getItem('sp_client_id') || DEFAULT_CLIENT_ID;
 
   // Handle PKCE callback (?code=...&state=...)
   const params = new URLSearchParams(window.location.search);
