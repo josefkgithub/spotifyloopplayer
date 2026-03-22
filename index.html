@@ -151,20 +151,10 @@ document.head.appendChild(link);
 <div class="scroll" id="scroll">
 
   <!-- AUTH -->
-  <div id="auth-panel">
-    <div class="auth-box">
-      <strong>Connect your Spotify account</strong><br>
-      Tap the button below to log in with Spotify Premium.
-      <br><br>
-      <div style="display:flex;gap:8px;">
-        <button class="btn-green" style="flex:1;" onclick="startPKCE()">Connect Spotify</button>
-        <button class="btn-ghost" onclick="loadDemo()">Demo</button>
-      </div>
-      <div class="token-pill" id="token-status" style="display:none;"></div>
-      <div style="margin-top:10px;font-size:11px;color:#555;">
-        Redirect URI to whitelist: <span id="redirect-uri-lbl" style="color:#888;word-break:break-all;"></span>
-      </div>
-    </div>
+  <div id="auth-panel" style="padding-top:2rem;display:flex;flex-direction:column;align-items:center;gap:12px;">
+    <button class="btn-green" style="width:100%;max-width:320px;padding:1rem;font-size:17px;border-radius:14px;" onclick="startPKCE()">Connect with Spotify</button>
+    <div class="token-pill" id="token-status" style="display:none;"></div>
+    <div id="redirect-uri-lbl" style="font-size:11px;color:#444;text-align:center;word-break:break-all;max-width:320px;"></div>
   </div>
 
   <!-- LOAD TRACK (shown after auth) -->
@@ -494,13 +484,20 @@ function switchTab(name) {
 }
 
 // ── Playback ──────────────────────────────────────────────────────────────────
+let activated = false;
+
 function togglePlay() {
-  if (demoMode) { isPlaying=!isPlaying; document.getElementById('play-btn').innerHTML=isPlaying?'&#9646;&#9646;':'&#9654;'; return; }
   if (!player) return;
-  // activateElement() is required on iOS to unlock audio context on first user gesture
-  player.activateElement().then(() => {
+  // iOS Safari requires activateElement() on every tap before any audio call.
+  // It must run synchronously within the user gesture — no await, no .then() chaining.
+  player.activateElement();
+  if (!activated) {
+    activated = true;
+    // First play: resume after a short delay to let the audio context unlock
+    setTimeout(() => player.resume(), 80);
+  } else {
     isPlaying ? player.pause() : player.resume();
-  });
+  }
 }
 
 async function seek(delta) {
@@ -663,11 +660,8 @@ if ('serviceWorker' in navigator) {
   loadFavs();
   document.getElementById('redirect-uri-lbl').textContent = REDIRECT_URI;
   document.getElementById('settings-redirect').textContent = REDIRECT_URI;
-  // Pre-fill track URL
   const trackInput = document.getElementById('track-url');
   if (trackInput) trackInput.value = DEFAULT_TRACK_URL;
-
-  const stored = localStorage.getItem('sp_client_id') || DEFAULT_CLIENT_ID;
 
   // Handle PKCE callback (?code=...&state=...)
   const params = new URLSearchParams(window.location.search);
