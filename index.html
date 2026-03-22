@@ -214,7 +214,7 @@ document.head.appendChild(link);
 
     <div class="card" id="loops-card" style="display:none;">
       <div class="section-label">Saved loops</div>
-      <div id="loops-list" style="max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
+      <div id="loops-list" style="height:200px;overflow-y:scroll;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;"></div>
     </div>
 
   </div>
@@ -410,8 +410,8 @@ function applyTrack() {
   document.getElementById('track-art').src = currentTrack.art;
   trackDuration = currentTrack.duration;
   loops = favorites[currentTrack.id] ? favorites[currentTrack.id].loops.map(l=>({...l})) : [];
-  activeLoopIdx = -1; loopA = 0; loopB = trackDuration;
-  updateHandles(); updateFavStar(); updateFavList();
+  activeLoopIdx = -1; loopA = 0; loopB = trackDuration; // B defaults to end of song
+  updateFavStar(); updateFavList();
   ['player-card','save-card','loops-card'].forEach(i => document.getElementById(i).style.display='');
   // Hide auth + load-track panels once a track is loaded
   document.getElementById('auth-panel').style.display = 'none';
@@ -419,6 +419,8 @@ function applyTrack() {
   document.getElementById('tabbar').style.display = '';
   renderLoops(); switchTab('player');
   posAtLastSync = 0; lastTimestamp = performance.now(); startRAF();
+  // Defer handle placement so the timeline has its final rendered width
+  requestAnimationFrame(() => updateHandles());
 }
 
 // ── Favorites ─────────────────────────────────────────────────────────────────
@@ -579,7 +581,11 @@ function dragMove(x) {
   updateHandles();
 }
 document.addEventListener('mousemove', e => dragMove(e.clientX));
-document.addEventListener('touchmove', e => { e.preventDefault(); dragMove(e.touches[0].clientX); }, {passive:false});
+document.addEventListener('touchmove', e => {
+  if (!dragging) return;
+  e.preventDefault();
+  dragMove(e.touches[0].clientX);
+}, {passive:false});
 document.addEventListener('mouseup', () => dragging=null);
 document.addEventListener('touchend', () => dragging=null);
 
