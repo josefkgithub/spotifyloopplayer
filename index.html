@@ -606,7 +606,6 @@ function renderLoops() {
     d.className='loop-item'+(i===activeLoopIdx?' active-loop':'');
     d.innerHTML=`<span class="loop-item-name">${lp.name}</span>
       <span class="loop-item-meta">${fmt(lp.a)}–${fmt(lp.b)}</span>
-      <span class="loop-item-meta" style="color:var(--green);margin-left:4px;">${lp.repeats===Infinity?'∞':'×'+lp.repeats}</span>
       <button class="btn-icon" style="color:#666;" onclick="delLoop(${i},event)">✕</button>`;
     d.onclick=()=>activateLoop(i);
     list.appendChild(d);
@@ -615,11 +614,9 @@ function renderLoops() {
 
 function activateLoop(i) {
   activeLoopIdx=i; const lp=loops[i];
-  loopA=lp.a; loopB=lp.b; repeatCount=lp.repeats; repeatsDone=0;
-  document.getElementById('rep-count').value=lp.repeats===Infinity?'':lp.repeats;
-  document.getElementById('loop-badge').textContent=lp.repeats===Infinity?'∞':'×'+lp.repeats;
-  document.getElementById('loop-badge2').textContent=lp.repeats===Infinity?'Loop ∞':'Loop ×'+lp.repeats;
-  updateHandles(); seekTo(loopA); renderLoops();
+  loopA=lp.a; loopB=lp.b; repeatsDone=0;
+  requestAnimationFrame(() => updateHandles());
+  seekTo(loopA); renderLoops();
 }
 
 function delLoop(i,e) {
