@@ -237,6 +237,13 @@ document.head.appendChild(link);
   <!-- SETTINGS TAB -->
   <div class="tab-panel" id="tab-settings">
     <div class="card">
+      <div class="section-label">Load a different track</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <input id="track-url-settings" placeholder="Paste Spotify track URL or ID…" />
+        <button class="btn-green" onclick="loadTrackFromSettings()">Load Track</button>
+      </div>
+    </div>
+    <div class="card">
       <div class="section-label">Spotify connection</div>
       <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">
         Client ID: <span id="settings-cid" style="color:#fff;"></span>
@@ -414,6 +421,9 @@ function applyTrack() {
   activeLoopIdx = -1; loopA = 0; loopB = trackDuration;
   updateHandles(); updateFavStar(); updateFavList();
   ['player-card','save-card','loops-card'].forEach(i => document.getElementById(i).style.display='');
+  // Hide auth + load-track panels once a track is loaded
+  document.getElementById('auth-panel').style.display = 'none';
+  document.getElementById('url-card').style.display = 'none';
   document.getElementById('tabbar').style.display = '';
   renderLoops(); switchTab('player');
   posAtLastSync = 0; lastTimestamp = performance.now(); startRAF();
@@ -655,7 +665,14 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
 }
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
+function loadTrackFromSettings() {
+  const input = document.getElementById('track-url-settings');
+  document.getElementById('track-url').value = input.value;
+  input.value = '';
+  loadTrack();
+}
+
+
 (async function init() {
   loadFavs();
   document.getElementById('redirect-uri-lbl').textContent = REDIRECT_URI;
