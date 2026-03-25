@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+// ── Loops ─────────────────────────────────────────────────────────────────────<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
@@ -82,13 +82,14 @@ document.head.appendChild(link);
   .track-meta h2 { font-size: 1rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .track-meta p { font-size: 13px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  .timeline-wrap { position: relative; height: 52px; margin-bottom: 6px; touch-action: none; }
-  .tl-bg { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 5px; background: #333; border-radius: 3px; }
-  .tl-progress { position: absolute; left: 0; top: 50%; transform: translateY(-50%); height: 5px; background: #555; border-radius: 3px; pointer-events: none; }
-  .loop-region { position: absolute; top: 50%; transform: translateY(-50%); height: 5px; background: #1DB95455; border-radius: 3px; pointer-events: none; }
-  .loop-handle { position: absolute; top: 50%; transform: translate(-50%,-50%); width: 18px; height: 28px; background: var(--green); border-radius: 5px; z-index: 10; touch-action: none; }
-  .loop-handle-label { position: absolute; top: -17px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 700; color: var(--green); }
-  .playhead { position: absolute; top: 50%; transform: translate(-50%,-50%); width: 16px; height: 16px; background: #fff; border-radius: 50%; pointer-events: none; z-index: 20; }
+  .tl-row-wrap { position: relative; height: 44px; margin-bottom: 4px; touch-action: none; cursor: crosshair; }
+  .tl-row-label { position: absolute; left: 0; top: 50%; transform: translateY(-50%); font-size: 10px; color: #555; width: 28px; text-align: right; pointer-events: none; }
+  .tl-row-inner { position: absolute; left: 34px; right: 0; top: 50%; transform: translateY(-50%); height: 5px; background: #333; border-radius: 3px; }
+  .tl-row-progress { position: absolute; left: 0; top: 0; height: 5px; background: #555; border-radius: 3px; pointer-events: none; }
+  .tl-row-loop { position: absolute; top: 0; height: 5px; background: #1DB95455; border-radius: 3px; pointer-events: none; }
+  .tl-row-playhead { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 12px; height: 12px; background: #fff; border-radius: 50%; pointer-events: none; z-index: 20; display: none; }
+  .tl-row-handle { position: absolute; top: 50%; transform: translate(-50%, -50%); width: 16px; height: 26px; background: var(--green); border-radius: 4px; z-index: 10; touch-action: none; display: none; }
+  .tl-row-handle-label { position: absolute; top: -16px; left: 50%; transform: translateX(-50%); font-size: 10px; font-weight: 700; color: var(--green); }
   .loop-times { display: flex; gap: 6px; font-size: 12px; color: var(--muted); margin-bottom: 10px; flex-wrap: wrap; }
   .loop-times span { background: var(--input); border-radius: 6px; padding: 3px 8px; }
   .loop-times span b { color: var(--green); }
@@ -158,15 +159,7 @@ document.head.appendChild(link);
         <button class="btn-icon star" id="fav-star" onclick="toggleFav()" style="color:#444;">&#9733;</button>
       </div>
 
-      <div class="timeline-wrap" id="timeline"
-           onmousedown="tlDown(event)" ontouchstart="tlTouchDown(event)">
-        <div class="tl-bg"></div>
-        <div class="tl-progress" id="tl-prog"></div>
-        <div class="loop-region" id="loop-region"></div>
-        <div class="loop-handle" id="ha" onmousedown="hDown(event,'a')" ontouchstart="hTouchDown(event,'a')"><span class="loop-handle-label">A</span></div>
-        <div class="loop-handle" id="hb" onmousedown="hDown(event,'b')" ontouchstart="hTouchDown(event,'b')"><span class="loop-handle-label">B</span></div>
-        <div class="playhead" id="playhead"></div>
-      </div>
+      <div id="timeline-rows"></div>
 
       <div class="loop-times">
         <span>Loop: <b id="lbl-a">0:00</b> → <b id="lbl-b">0:00</b></span>
@@ -416,7 +409,7 @@ function applyTrack() {
   renderLoops(); switchTab('player');
   posAtLastSync = 0; lastTimestamp = performance.now();
   startRAF();
-  requestAnimationFrame(() => updateHandles());
+  requestAnimationFrame(() => { buildTimeline(); updateHandles(); });
 }
 
 function loadTrackFromSettings() {
@@ -504,45 +497,169 @@ function switchTab(name) {
   });
 }
 
-// ── Timeline ──────────────────────────────────────────────────────────────────
-function fmt(s) { const m=Math.floor(s/60), ss=Math.floor(s%60); return m+':'+String(ss).padStart(2,'0'); }
-function tlR() { return document.getElementById('timeline').getBoundingClientRect(); }
-function xToT(x) { const r=tlR(); return Math.max(0, Math.min(trackDuration, ((x-r.left)/r.width)*trackDuration)); }
-function fr(t) { return trackDuration ? t/trackDuration : 0; }
+// ── Multi-row Timeline ────────────────────────────────────────────────────────
+const ROW_SECS = 30; // each row = 30 seconds
+let numRows = 1;
+
+function buildTimeline() {
+  numRows = Math.ceil(trackDuration / ROW_SECS);
+  const container = document.getElementById('timeline-rows');
+  container.innerHTML = '';
+  for (let r = 0; r < numRows; r++) {
+    const rowStart = r * ROW_SECS;
+    const rowEnd   = Math.min(rowStart + ROW_SECS, trackDuration);
+    const wrap = document.createElement('div');
+    wrap.className = 'tl-row-wrap';
+    wrap.dataset.row = r;
+    wrap.innerHTML = `
+      <span class="tl-row-label">${fmt(rowStart)}</span>
+      <div class="tl-row-inner">
+        <div class="tl-row-progress" id="tlp-${r}"></div>
+        <div class="tl-row-loop"     id="tll-${r}"></div>
+        <div class="tl-row-playhead" id="tlh-${r}"></div>
+        <div class="tl-row-handle"   id="tha-${r}" data-handle="a" data-row="${r}"><span class="tl-row-handle-label">A</span></div>
+        <div class="tl-row-handle"   id="thb-${r}" data-handle="b" data-row="${r}"><span class="tl-row-handle-label">B</span></div>
+      </div>`;
+    // tap on row background → seek
+    wrap.addEventListener('mousedown',  e => onRowDown(e, r));
+    wrap.addEventListener('touchstart', e => onRowTouchStart(e, r), {passive: false});
+    container.appendChild(wrap);
+    // handle drag listeners
+    ['a','b'].forEach(which => {
+      const hEl = document.getElementById(`th${which}-${r}`);
+      hEl.addEventListener('mousedown',  e => { e.stopPropagation(); startHandleDrag(e.clientX, which); });
+      hEl.addEventListener('touchstart', e => { e.stopPropagation(); e.preventDefault(); startHandleDrag(e.touches[0].clientX, which, r); }, {passive:false});
+    });
+  }
+}
+
+// Convert global time → (row, fraction within row's inner bar)
+function timeToRowFrac(t, row) {
+  const rowStart = row * ROW_SECS;
+  const rowEnd   = Math.min(rowStart + ROW_SECS, trackDuration);
+  return (t - rowStart) / (rowEnd - rowStart);
+}
+
+// Convert click x on a row's inner bar → global time
+function rowXToTime(clientX, row) {
+  const inner = document.querySelector(`#timeline-rows .tl-row-wrap[data-row="${row}"] .tl-row-inner`);
+  if (!inner) return 0;
+  const r = inner.getBoundingClientRect();
+  const frac = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+  const rowStart = row * ROW_SECS;
+  const rowEnd   = Math.min(rowStart + ROW_SECS, trackDuration);
+  return rowStart + frac * (rowEnd - rowStart);
+}
 
 function updateHandles() {
-  const w = document.getElementById('timeline').offsetWidth;
-  const ax = fr(loopA)*w, bx = fr(loopB)*w;
-  document.getElementById('ha').style.left = ax+'px';
-  document.getElementById('hb').style.left = bx+'px';
-  document.getElementById('loop-region').style.left = ax+'px';
-  document.getElementById('loop-region').style.width = (bx-ax)+'px';
-  document.getElementById('lbl-a').textContent = fmt(loopA);
-  document.getElementById('lbl-b').textContent = fmt(loopB);
-  document.getElementById('lbl-dur').textContent = fmt(Math.max(0, loopB-loopA));
+  for (let r = 0; r < numRows; r++) {
+    const rowStart = r * ROW_SECS;
+    const rowEnd   = Math.min(rowStart + ROW_SECS, trackDuration);
+    const inner    = document.querySelector(`#timeline-rows .tl-row-wrap[data-row="${r}"] .tl-row-inner`);
+    if (!inner) continue;
+    const w = inner.offsetWidth;
+
+    // progress bar
+    const progEl = document.getElementById(`tlp-${r}`);
+    if (progEl) {
+      if (currentPos <= rowStart) progEl.style.width = '0%';
+      else if (currentPos >= rowEnd) progEl.style.width = '100%';
+      else progEl.style.width = ((currentPos - rowStart) / (rowEnd - rowStart) * 100) + '%';
+    }
+
+    // loop highlight
+    const loopEl = document.getElementById(`tll-${r}`);
+    if (loopEl) {
+      const la = Math.max(loopA, rowStart), lb = Math.min(loopB, rowEnd);
+      if (lb <= rowStart || la >= rowEnd) { loopEl.style.width = '0'; loopEl.style.left = '0'; }
+      else {
+        loopEl.style.left  = ((la - rowStart) / (rowEnd - rowStart) * 100) + '%';
+        loopEl.style.width = ((lb - la) / (rowEnd - rowStart) * 100) + '%';
+      }
+    }
+
+    // playhead
+    const ph = document.getElementById(`tlh-${r}`);
+    if (ph) {
+      const visible = currentPos >= rowStart && currentPos <= rowEnd;
+      ph.style.display = visible ? 'block' : 'none';
+      if (visible) ph.style.left = ((currentPos - rowStart) / (rowEnd - rowStart) * w) + 'px';
+    }
+
+    // handle A
+    const ha = document.getElementById(`tha-${r}`);
+    if (ha) {
+      const onRow = loopA >= rowStart && loopA <= rowEnd;
+      ha.style.display = onRow ? 'block' : 'none';
+      if (onRow) ha.style.left = ((loopA - rowStart) / (rowEnd - rowStart) * w) + 'px';
+    }
+
+    // handle B
+    const hb = document.getElementById(`thb-${r}`);
+    if (hb) {
+      const onRow = loopB >= rowStart && loopB <= rowEnd;
+      hb.style.display = onRow ? 'block' : 'none';
+      if (onRow) hb.style.left = ((loopB - rowStart) / (rowEnd - rowStart) * w) + 'px';
+    }
+  }
+  document.getElementById('lbl-a').textContent   = fmt(loopA);
+  document.getElementById('lbl-b').textContent   = fmt(loopB);
+  document.getElementById('lbl-dur').textContent = fmt(Math.max(0, loopB - loopA));
 }
 
 function updateUI() {
   if (!trackDuration) return;
-  const f = Math.min(1, currentPos/trackDuration);
-  document.getElementById('tl-prog').style.width = (f*100)+'%';
-  document.getElementById('playhead').style.left = (f*document.getElementById('timeline').offsetWidth)+'px';
   document.getElementById('tcur').textContent = fmt(currentPos);
   document.getElementById('ttot').textContent = fmt(trackDuration);
+  updateHandles();
+}
+
+// row tap → seek
+function onRowDown(e, row) {
+  if (e.target.closest('.tl-row-handle')) return;
+  seekTo(rowXToTime(e.clientX, row));
+}
+function onRowTouchStart(e, row) {
+  if (e.target.closest('.tl-row-handle')) return;
+  seekTo(rowXToTime(e.touches[0].clientX, row));
+}
+
+// handle drag
+function startHandleDrag(clientX, which, row) {
+  dragging = which;
+  dragStartX = clientX;
+  dragStartVal = which === 'a' ? loopA : loopB;
+  // store row width for delta calculation
+  draggingRow = row;
+}
+let draggingRow = 0;
+
+function dragMove(clientX) {
+  if (!dragging) return;
+  const inner = document.querySelector(`#timeline-rows .tl-row-wrap[data-row="${draggingRow}"] .tl-row-inner`);
+  if (!inner) return;
+  const rowW = inner.offsetWidth;
+  const rowStart = draggingRow * ROW_SECS;
+  const rowEnd   = Math.min(rowStart + ROW_SECS, trackDuration);
+  const dtSecs   = ((clientX - dragStartX) / rowW) * (rowEnd - rowStart);
+  const v = Math.max(0, Math.min(trackDuration, dragStartVal + dtSecs));
+  if (dragging === 'a') loopA = Math.min(v, loopB - 0.5);
+  else                  loopB = Math.max(v, loopA + 0.5);
+  updateHandles();
 }
 
 function startRAF() {
   if (rafId) cancelAnimationFrame(rafId);
   function tick(now) {
     if (isPlaying) {
-      currentPos = posAtLastSync + (now-lastTimestamp)/1000;
+      currentPos = posAtLastSync + (now - lastTimestamp) / 1000;
       if (currentPos >= loopB) {
         currentPos = loopA; posAtLastSync = loopA; lastTimestamp = now;
-        if (player) player.seek(loopA*1000);
+        if (player) player.seek(loopA * 1000);
       }
       if (currentPos < loopA) {
         currentPos = loopA; posAtLastSync = loopA; lastTimestamp = now;
-        if (player) player.seek(loopA*1000);
+        if (player) player.seek(loopA * 1000);
       }
       updateUI();
     }
@@ -553,33 +670,20 @@ function startRAF() {
 
 function seekTo(t) {
   currentPos = t; posAtLastSync = t; lastTimestamp = performance.now();
-  if (player) player.seek(t*1000);
+  if (player) player.seek(t * 1000);
   updateUI();
 }
 
-function tlDown(e)      { if (e.target.classList.contains('loop-handle')) return; seekTo(xToT(e.clientX)); }
-function tlTouchDown(e) { if (e.target.classList.contains('loop-handle')) return; seekTo(xToT(e.touches[0].clientX)); }
-function hDown(e, w)      { e.stopPropagation(); e.preventDefault(); dragging=w; dragStartX=e.clientX; dragStartVal=w==='a'?loopA:loopB; }
-function hTouchDown(e, w) { e.stopPropagation(); e.preventDefault(); dragging=w; dragStartX=e.touches[0].clientX; dragStartVal=w==='a'?loopA:loopB; }
+function fmt(s) { const m = Math.floor(s/60), ss = Math.floor(s%60); return m+':'+String(ss).padStart(2,'0'); }
 
-function dragMove(x) {
-  if (!dragging) return;
-  const dt = ((x-dragStartX)/tlR().width)*trackDuration;
-  const v = Math.max(0, Math.min(trackDuration, dragStartVal+dt));
-  if (dragging==='a') loopA=Math.min(v, loopB-1);
-  else loopB=Math.max(v, loopA+1);
-  updateHandles();
-}
 document.addEventListener('mousemove', e => dragMove(e.clientX));
 document.addEventListener('touchmove', e => {
   if (!dragging) return;
   e.preventDefault();
   dragMove(e.touches[0].clientX);
-}, {passive:false});
-document.addEventListener('mouseup',  () => dragging=null);
-document.addEventListener('touchend', () => dragging=null);
-
-// ── Loops ─────────────────────────────────────────────────────────────────────
+}, {passive: false});
+document.addEventListener('mouseup',  () => dragging = null);
+document.addEventListener('touchend', () => dragging = null);
 function saveLoop() {
   const name = document.getElementById('loop-name').value.trim() || `Loop ${loops.length+1}`;
   loops.push({name, a:loopA, b:loopB});
