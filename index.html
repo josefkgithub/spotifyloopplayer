@@ -405,6 +405,7 @@ async function loadTrack(idOverride) {
 }
 
 function applyTrack() {
+  activated = false;
   document.getElementById('track-name').textContent = currentTrack.name;
   document.getElementById('track-artist').textContent = currentTrack.artist;
   document.getElementById('track-art').src = currentTrack.art;
